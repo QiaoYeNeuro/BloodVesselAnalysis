@@ -1,0 +1,111 @@
+// Set the folder path where .tif files are located
+folderPath = "Y:/Lab/Qiao_public/dataimages/Qiao/Eric's endothelial project/R1-quantification/Fig2/";
+outputCSV = "Y:/Lab/Qiao_public/dataimages/Qiao/Eric's endothelial project/R1-quantification/threshold_values.csv";  // Path to save the CSV file
+// Set folder to save CSV files
+outputFolder = "Y:/Lab/Qiao_public/dataimages/Qiao/Eric's endothelial project/R1-quantification/Quantification_Results/";
+// Ensure output folder exists
+File.makeDirectory(outputFolder);'
+
+// Initialize an empty string to store CSV content
+csvContent = "File Name,Lower Threshold\n";  // CSV header
+
+// Get list of all .tif files in the folder
+fileList = getFileList(folderPath);
+
+// Loop through each .tif file in the folder
+for (i = 0; i < fileList.length; i++) {
+    // Only process .tif files
+    if (endsWith(fileList[i], ".tif")) {
+        // Open the .tif file
+        open(folderPath + fileList[i]);
+        print("Opened file: " + fileList[i]);
+
+        // Split color channels
+        run("Split Channels");
+
+		// Construct the channel window names
+		//greenChannelTitle = originalTitle + " (green)";
+		//redChannelTitle = originalTitle + " (red)";
+		//blueChannelTitle = originalTitle + " (blue)";
+
+
+        // Select the green channel (or change this to Red or Blue if needed)
+        originalTitle = replace(fileList[i], ".tif", "");
+        greenChannelTitle = originalTitle + ".tif (green)";
+        selectWindow(greenChannelTitle);
+		// Convert the green channel to 8-bit grayscale
+		run("8-bit");
+		
+        // Set the threshold limits and open the threshold adjustment window
+        setThreshold(0, 255); // Set the threshold range from 0 to 255
+        run("Threshold..."); // Open the threshold adjustment window
+
+		// Wait for the user to manually adjust the threshold and click OK
+        waitForUser("Adjust the threshold manually for " + greenChannelTitle + " as needed. Click OK to continue to the next file.");
+
+        // Capture the manually set threshold values
+        getThreshold(lowerLimit, upperLimit);
+        print("Chosen lower threshold for " + fileList[i] + ": " + lowerLimit);
+
+
+		run("Convert to Mask");  // Convert to binary mask based on the threshold
+
+		// Run the custom "Quantification" macro
+		run("Quantification");
+
+		// Function to save a table to CSV if the window is open
+		function saveTable(windowTitle) {
+			if (isOpen(windowTitle)) {
+				selectWindow(windowTitle);
+				// Format: baseFileName_windowName.csv
+				fileName = greenChannelTitle + "_" + replace(windowTitle, " ", "_") + ".csv";
+				saveAs("Results", outputFolder + fileName);
+				close();
+				print("Saved " + windowTitle + " to " + outputFolder + fileName);
+			} else {
+				print("Window " + windowTitle + " not found or closed.");
+			}
+		}
+
+		// Save each of the required tables with the corrected file name format
+		saveTable("Branch information");
+		saveTable("Nearest Neighbor Distances");
+		saveTable("Results");
+
+        // Append the file name and lower threshold to the CSV content
+        csvContent += fileList[i] + "," + lowerLimit + "\n";
+
+        // Close all open images by iterating through open windows
+        openWindows = getList("image.titles");  // Get list of all open image windows
+        for (j = 0; j < openWindows.length; j++) {
+            selectWindow(openWindows[j]);
+            close();
+        }
+		
+		// Close the Results window if it is open
+		if (isOpen("Results")) {
+			selectWindow("Results");
+			run("Close");
+			print("Results window has been closed.");
+		}
+		
+		
+		// Get a list of all open window titles
+		openWindows = getList("window.titles");
+
+		// Close all csv windows
+		for (k = 0; k < openWindows.length; k++) {
+			if (endsWith(openWindows[k], ".csv")) {
+				selectWindow(openWindows[k]);
+				run("Close");
+				print("Closed CSV window: " + openWindows[k]);
+			}
+		}
+		
+        print("Closed all windows for file: " + fileList[i]);
+		print("Processing completed for image:", i);
+    }
+}
+// Write the CSV content to a file after processing all images
+File.saveString(csvContent, outputCSV);
+print("CSV file with threshold values saved to: " + outputCSV);

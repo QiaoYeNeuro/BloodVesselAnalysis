@@ -1,0 +1,130 @@
+// Set the folder path where .tif files are located
+folderPath = "Y:/Lab/Qiao_public/dataimages/Qiao/Eric's endothelial project/R1-quantification/Fig7/";
+outputCSV = "Y:/Lab/Qiao_public/dataimages/Qiao/Eric's endothelial project/R1-quantification/threshold_values-Fig7.csv";  // Path to save the CSV file
+// Set folder to save CSV files
+outputFolder = "Y:/Lab/Qiao_public/dataimages/Qiao/Eric's endothelial project/R1-quantification/Quantification_Results-Fig7/";
+// Ensure output folder exists
+File.makeDirectory(outputFolder);'
+
+
+
+// Initialize an empty string to store CSV content
+csvContent = "File Name,Channel,Lower Threshold\n";  // Updated CSV header
+
+// Get list of all .tif files in the folder
+fileList = getFileList(folderPath);
+
+// Loop through each .tif file in the folder
+for (i = 0; i < fileList.length; i++) {
+    // Only process .tif files
+    if (endsWith(fileList[i], ".tif")) {
+        // Open the .tif file
+        open(folderPath + fileList[i]);
+        print("Opened file: " + fileList[i]);
+
+        // Split color channels
+        run("Split Channels");
+
+        // Construct channel window titles
+        originalTitle = replace(fileList[i], ".tif", "");
+        greenChannelTitle = "C1-" + originalTitle + ".tif";
+        cy5ChannelTitle = "C2-" + originalTitle + ".tif";
+
+        // Ensure both channels are found
+        if (!isOpen(greenChannelTitle) || !isOpen(cy5ChannelTitle)) {
+            print("Error: Expected channel windows not found for file: " + fileList[i]);
+            close("*");
+            continue; // Skip this file and move to the next
+        }
+
+        print("Detected green channel: " + greenChannelTitle);
+        print("Detected cy5 channel: " + cy5ChannelTitle);
+
+        // List of channels to process
+        channels = newArray("Green", "Cy5");
+        channelTitles = newArray(greenChannelTitle, cy5ChannelTitle);
+
+        // Loop through each channel
+        for (ch = 0; ch < channels.length; ch++) {
+            channelName = channels[ch];
+            channelTitle = channelTitles[ch];
+
+            // Select the channel window
+            selectWindow(channelTitle);
+
+            // Convert to 8-bit
+            run("8-bit");
+
+            // Set the threshold limits and open the threshold adjustment window
+            setThreshold(0, 255); // Set the threshold range from 0 to 255
+            run("Threshold..."); // Open the threshold adjustment window
+
+            // Wait for the user to manually adjust the threshold and click OK
+            waitForUser("Adjust the threshold manually for " + channelName + " channel of " + fileList[i] + ". Click OK to continue.");
+
+            // Capture the manually set threshold values
+            getThreshold(lowerLimit, upperLimit);
+            print("Chosen lower threshold for " + channelName + " channel of " + fileList[i] + ": " + lowerLimit);
+
+            // Convert to binary mask based on the threshold
+            run("Convert to Mask");
+
+            // Run the custom "Quantification" macro
+            run("Quantification");
+
+            // Save results for the current channel
+			function saveTable(windowTitle, imageName, channelName) {
+				if (isOpen(windowTitle)) {
+					selectWindow(windowTitle);
+					// Include the image name and channel name in the output file name
+					fileName = imageName + "_" + channelName + "_" + replace(windowTitle, " ", "_") + ".csv";
+					saveAs("Results", outputFolder + fileName);
+					close();
+					print("Saved " + windowTitle + " to " + outputFolder + fileName);
+				} else {
+					print("Window " + windowTitle + " not found or closed.");
+				}
+			}
+
+
+            // Save required tables
+            saveTable("Branch information", originalTitle, channelName);
+            saveTable("Nearest Neighbor Distances", originalTitle, channelName);
+            saveTable("Results", originalTitle, channelName);
+
+            // Append the file name, channel name, and lower threshold to the CSV content
+            csvContent += fileList[i] + "," + channelName + "," + lowerLimit + "\n";
+        }
+
+        // Close all open images by iterating through open windows
+        run("Close All");
+        run("Collect Garbage");
+		
+		// Close the Results window if it is open
+		if (isOpen("Results")) {
+			selectWindow("Results");
+			run("Close");
+			print("Results window has been closed.");
+		}
+		
+		
+		// Get a list of all open window titles
+		openWindows = getList("window.titles");
+
+		// Close all csv windows
+		for (k = 0; k < openWindows.length; k++) {
+			if (endsWith(openWindows[k], ".csv")) {
+				selectWindow(openWindows[k]);
+				run("Close");
+				print("Closed CSV window: " + openWindows[k]);
+			}
+		}
+		
+        print("Processing completed for file: " + fileList[i]);
+    }
+}
+
+// Write the CSV content to a file after processing all images
+File.saveString(csvContent, outputCSV);
+print("CSV file with threshold values saved to: " + outputCSV);
+
