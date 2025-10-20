@@ -1,0 +1,107 @@
+// Set the folder path and the path to the CSV file containing threshold values
+folderPath = "Y:/Lab/Qiao_public/dataimages/Qiao/Eric's endothelial project/R1-quantification/Fig2/";
+csvPath = "Y:/Lab/Qiao_public/dataimages/Qiao/Eric's endothelial project/R1-quantification/threshold_values.csv";
+
+// Specify the image index (n) for processing
+imageIndex = 2;  // For example, n=2 means the second image and second threshold
+
+// Get the list of .tif files in the folder
+list = getFileList(folderPath);
+numImages = list.length;
+
+// Ensure that the selected index is within the range of available images
+if (imageIndex < 1 || imageIndex > numImages) {
+    exit("Image index out of range. Please choose a value between 1 and " + numImages);
+}
+
+// Open the nth .tif file
+filePath = folderPath + list[imageIndex - 1];
+open(filePath);
+print("Opened image:", list[imageIndex - 1]);
+
+// Get the original title to construct channel window names
+originalTitle = getTitle();
+
+// Split the channels
+run("Split Channels");
+
+// Construct the channel window names
+greenChannelTitle = originalTitle + " (green)";
+redChannelTitle = originalTitle + " (red)";
+blueChannelTitle = originalTitle + " (blue)";
+
+// Close the red and blue channels
+selectWindow(redChannelTitle);
+close();
+selectWindow(blueChannelTitle);
+close();
+
+// Select the green channel window
+selectWindow(greenChannelTitle);
+
+// Convert the green channel to 8-bit grayscale
+run("8-bit");
+
+// Load the threshold values from the CSV file
+thresholdValues = File.openAsString(csvPath);
+thresholdArray = split(thresholdValues, "\n");
+
+// Ensure the selected index is within the range of threshold values
+if (imageIndex > thresholdArray.length) {
+    exit("Threshold index out of range. Please check the CSV file.");
+}
+
+// Parse the nth row to get the threshold from the second column
+row = split(thresholdArray[imageIndex - 1], ",");
+if (row.length < 2) {
+    exit("Error: Missing threshold value in the second column for row " + imageIndex);
+}
+thresholdValue = parseFloat(row[1]);
+print("Applying threshold value:", thresholdValue);
+
+// Apply threshold
+setAutoThreshold("Default");  // Optional: Set default threshold method
+setThreshold(thresholdValue, 255);  // Apply the nth threshold value
+run("Convert to Mask");  // Convert to binary mask based on the threshold
+
+// Run the custom "Quantification" macro
+run("Quantification");
+
+
+
+
+
+
+
+// Set folder to save CSV files
+outputFolder = "Y:/Lab/Qiao_public/dataimages/Qiao/Eric's endothelial project/R1-quantification/Quantification_Results/";
+
+// Ensure output folder exists
+File.makeDirectory(outputFolder);'
+
+
+// Function to save a table to CSV if the window is open
+function saveTable(windowTitle) {
+    if (isOpen(windowTitle)) {
+        selectWindow(windowTitle);
+        // Format: baseFileName_windowName.csv
+        fileName = greenChannelTitle + "_" + replace(windowTitle, " ", "_") + ".csv";
+        saveAs("Results", outputFolder + fileName);
+        close();
+        print("Saved " + windowTitle + " to " + outputFolder + fileName);
+    } else {
+        print("Window " + windowTitle + " not found or closed.");
+    }
+}
+
+// Save each of the required tables with the corrected file name format
+saveTable("Branch information");
+saveTable("Nearest Neighbor Distances");
+saveTable("Results");
+
+
+print("Data export completed.");
+print("Processing completed for image:", list[imageIndex - 1]);
+
+
+
