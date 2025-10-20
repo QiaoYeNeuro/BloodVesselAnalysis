@@ -1,0 +1,27 @@
+// Set folder to save CSV files
+outputFolder = "Y:/Lab/Qiao_public/dataimages/Qiao/Eric's endothelial project/R1-quantification/Quantification_Results/";
+
+// Ensure output folder exists
+File.makeDirectory(outputFolder);'
+
+
+// Function to save a table to CSV if the window is open
+function saveTable(windowTitle) {
+    if (isOpen(windowTitle)) {
+        selectWindow(windowTitle);
+        // Format: baseFileName_windowName.csv
+        fileName = greenChannelTitle + "_" + replace(windowTitle, " ", "_") + ".csv";
+        saveAs("Results", outputFolder + fileName);
+        close();
+        print("Saved " + windowTitle + " to " + outputFolder + fileName);
+    } else {
+        print("Window " + windowTitle + " not found or closed.");
+    }
+}
+
+// Save each of the required tables with the corrected file name format
+saveTable("Branch information");
+saveTable("Nearest Neighbor Distances");
+saveTable("Results");
+
+print("Data export completed.");
