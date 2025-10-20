@@ -1,0 +1,52 @@
+// Set the folder path where .tif files are located
+folderPath = "Y:/Lab/Qiao_public/dataimages/Qiao/Eric's endothelial project/R1-quantification/Fig2-test/";
+outputCSV = "Y:/Lab/Qiao_public/dataimages/Qiao/Eric's endothelial project/R1-quantification/threshold_values.csv";  // Path to save the CSV file
+
+// Initialize an empty string to store CSV content
+csvContent = "File Name,Lower Threshold\n";  // CSV header
+
+// Get list of all .tif files in the folder
+fileList = getFileList(folderPath);
+
+// Loop through each .tif file in the folder
+for (i = 0; i < fileList.length; i++) {
+    // Only process .tif files
+    if (endsWith(fileList[i], ".tif")) {
+        // Open the .tif file
+        open(folderPath + fileList[i]);
+        print("Opened file: " + fileList[i]);
+
+        // Split color channels
+        run("Split Channels");
+
+        // Select the green channel (or change this to Red or Blue if needed)
+        originalTitle = replace(fileList[i], ".tif", "");
+        greenChannelTitle = originalTitle + ".tif (green)";
+        selectWindow(greenChannelTitle);
+
+        // Set the threshold limits and open the threshold adjustment window
+        setThreshold(0, 255); // Set the threshold range from 0 to 255
+        run("Threshold..."); // Open the threshold adjustment window
+
+        // Wait for the user to manually adjust the threshold and click OK
+        waitForUser("Adjust the threshold manually for " + greenChannelTitle + " as needed. Click OK to continue to the next file.");
+
+        // Capture the manually set threshold values
+        getThreshold(lowerLimit, upperLimit);
+        print("Chosen lower threshold for " + fileList[i] + ": " + lowerLimit);
+
+        // Append the file name and lower threshold to the CSV content
+        csvContent += fileList[i] + "," + lowerLimit + "\n";
+
+        // Close all open images by iterating through open windows
+        openWindows = getList("image.titles");  // Get list of all open image windows
+        for (j = 0; j < openWindows.length; j++) {
+            selectWindow(openWindows[j]);
+            close();
+        }
+        print("Closed all windows for file: " + fileList[i]);
+    }
+}
+// Write the CSV content to a file after processing all images
+File.saveString(csvContent, outputCSV);
+print("CSV file with threshold values saved to: " + outputCSV);
